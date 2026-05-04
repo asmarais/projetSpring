@@ -7,24 +7,20 @@ import java.util.List;
 @Entity
 @Getter @Setter
 @NoArgsConstructor @AllArgsConstructor
-@ToString(exclude = "classes")
+@ToString(exclude = "classe") // Changed to singular
 public class Utilisateur {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Schema(accessMode = Schema.AccessMode.READ_ONLY) // Hides ID in Swagger POST body
+    @Schema(accessMode = Schema.AccessMode.READ_ONLY)
     private Integer idUtilisateur;
 
     private String prenom;
     private String nom;
     private String password;
 
-    @ManyToMany
-    @JoinTable(
-            name = "utilisateur_classe",
-            joinColumns = @JoinColumn(name = "id_utilisateur"),
-            inverseJoinColumns = @JoinColumn(name = "code_classe")
-    )
-    @Schema(hidden = true) // Hide relationships from simple creation forms
-    private List<Classe> classes;
+    @ManyToOne
+    @JoinColumn(name = "code_classe") // Creates a foreign key column in the Utilisateur table
+    @Schema(hidden = true)
+    private Classe classe; // Changed from List<Classe> to Classe
 }

@@ -26,25 +26,19 @@ public class CoursClassroomServiceImpl implements ICoursClassroomService {
     private final ClasseRepository classeRepository;
     private final CoursClassroomRepository coursClassroomRepository;
 
-    // -------------------------------------------------------
     // a) Ajouter un utilisateur
-    // -------------------------------------------------------
     @Override
     public Utilisateur ajouterUtilisateur(Utilisateur utilisateur) {
         return utilisateurRepository.save(utilisateur);
     }
 
-    // -------------------------------------------------------
     // b) Ajouter une classe
-    // -------------------------------------------------------
     @Override
     public Classe ajouterClasse(Classe c) {
         return classeRepository.save(c);
     }
 
-    // -------------------------------------------------------
     // c) Ajouter un CoursClassroom et l'affecter à une classe
-    // -------------------------------------------------------
     @Override
     public CoursClassroom ajouterCoursClassroom(CoursClassroom cc, Integer codeClasse) {
         Classe classe = classeRepository.findById(codeClasse)
@@ -53,44 +47,37 @@ public class CoursClassroomServiceImpl implements ICoursClassroomService {
         return coursClassroomRepository.save(cc);
     }
 
-    // -------------------------------------------------------
-    // d) Affecter un utilisateur à une classe
-    // -------------------------------------------------------
+    // d) Affecter un utilisateur à une classe (Updated for ManyToOne)
     @Override
     public void affecterUtilisateurClasse(Integer idUtilisateur, Integer codeClasse) {
         Utilisateur utilisateur = utilisateurRepository.findById(idUtilisateur)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable : " + idUtilisateur));
+
         Classe classe = classeRepository.findById(codeClasse)
                 .orElseThrow(() -> new RuntimeException("Classe introuvable : " + codeClasse));
 
-        if (utilisateur.getClasses() == null) {
-            utilisateur.setClasses(new ArrayList<>());
-        }
-        utilisateur.getClasses().add(classe);
+        // Since a user can only have one class, we just set it (no more list .add)
+        utilisateur.setClasse(classe);
         utilisateurRepository.save(utilisateur);
     }
 
-    // -------------------------------------------------------
-    // e) Nombre d'utilisateurs pour un niveau donné
-    // -------------------------------------------------------
+    // e) Nombre d'utilisateurs pour un niveau donné (Updated logic)
     @Override
     public Integer nbUtilisateursParNiveau(Niveau nv) {
-        // On récupère toutes les classes du niveau voulu
+        // More efficient: count users where the class level matches
+        // You could also do this with a custom query in the repository:
+        // countByClasseNiveau(nv)
         List<Classe> classes = classeRepository.findAll().stream()
                 .filter(c -> c.getNiveau() == nv)
                 .toList();
 
-        // On compte les utilisateurs distincts dans ces classes
         return (int) classes.stream()
                 .filter(c -> c.getUtilisateurs() != null)
-                .flatMap(c -> c.getUtilisateurs().stream())
-                .distinct()
-                .count();
+                .mapToLong(c -> c.getUtilisateurs().size())
+                .sum();
     }
 
-    // -------------------------------------------------------
     // f) Désaffecter un CoursClassroom de sa classe
-    // -------------------------------------------------------
     @Override
     public void desaffecterCoursClassroomClasse(Integer idCours) {
         CoursClassroom cc = coursClassroomRepository.findById(idCours)
@@ -99,21 +86,22 @@ public class CoursClassroomServiceImpl implements ICoursClassroomService {
         coursClassroomRepository.save(cc);
     }
 
-    // -------------------------------------------------------
     // g) Archiver tous les CoursClassrooms toutes les 60 secondes
-    // -------------------------------------------------------
     @Override
-    @Scheduled(fixedRate = 60000)   // 60 000 ms = 60 secondes
+    @Scheduled(fixedRate = 60000)
     public void archiverCoursClassrooms() {
-        List<CoursClassroom> tous = coursClassroomRepository.findAll();
-        tous.forEach(cc -> cc.setArchive(true));
-        coursClassroomRepository.saveAll(tous);
-        log.info(">>> [Scheduler] {} cours archivés automatiquement", tous.size());
+        List<CoursClassroom> coursNonArchives = coursClassroomRepository.findAll().stream()
+                .filter(cc -> !Boolean.TRUE.equals(cc.getArchive())) // Only get non-archived ones
+                .toList();
+
+        if (!coursNonArchives.isEmpty()) {
+            coursNonArchives.forEach(cc -> cc.setArchive(true));
+            coursClassroomRepository.saveAll(coursNonArchives);
+            log.info(">>> [Scheduler] {} cours archivés automatiquement", coursNonArchives.size());
+        }
     }
 
-    // -------------------------------------------------------
     // h) Nombre d'heures pour une spécialité et un niveau
-    // -------------------------------------------------------
     @Override
     public Integer nbHeuresParSpecEtNiv(Specialite sp, Niveau nv) {
         Integer total = coursClassroomRepository.sumNbHeuresBySpecialiteAndNiveau(sp, nv);

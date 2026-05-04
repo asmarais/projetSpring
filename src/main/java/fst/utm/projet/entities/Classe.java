@@ -20,10 +20,10 @@ public class Classe {
 
     private String titre;
 
-    @Enumerated(EnumType.STRING) // Requirement: stored as String
+    @Enumerated(EnumType.STRING)
     private Niveau niveau;
 
-    @ManyToMany(mappedBy = "classes")
+    @OneToMany(mappedBy = "classe") // Points to the 'classe' field in Utilisateur
     @JsonIgnore
     @Schema(hidden = true)
     private List<Utilisateur> utilisateurs;
